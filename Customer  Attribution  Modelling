@@ -1,0 +1,92 @@
+#Loaded the data into a data frame named Customerattributiondata and change the name dstv
+dstv <-Customerattributiondata
+# Removing SEA-NON-BRAND FROM CUSTOMERID AND ALSO CORRECTING MISPELLED NAMES LIKE ADWORDS/
+dstv <- subset(dstv, MARKETINGCHANNEL!= "SEA_NON-BRAND")
+dstv <- subset(dstv, CUSTOMERID!= "SEA_NON-BRAND\"")
+dstv$MARKETINGCHANNEL <- sub("Adwords/", "Adwords", dstv$MARKETINGCHANNEL)
+dstv$MARKETINGCHANNEL <- gsub("SEA_NON-BRAND\"", "SEA_NON-BRAND", dstv$MARKETINGCHANNEL)
+# Replacing all NA to zero from REVENUE for readibility
+dstv$REVENUE[which(is.na(dstv$REVENUE))] <-0
+## Preprocessing the data
+dstv_cookies <- dstv %>% tidyr::gather(cookies, count_cookies, `CUSTOMERID`)
+# Removing unwanted columns as empty
+dstv_cookies$cookies <- NULL
+# Using the library 'lubridate' to arrange my DateTime
+time_posix <- ymd_hms(dstv$TIMESTAMP_TOUCHPOINT)
+dstv %>%
+mutate(time_posix = ymd_hms(TIMESTAMP_TOUCHPOINT)) %>%
+group_by(year = year(time_posix),
+month = month(time_posix),
+day = day(time_posix),
+hour = hour(time_posix),
+channels = MARKETINGCHANNEL) %>%
+
+summarise(count = n(), total_revenue = sum(REVENUE, na.rm = TRUE)) %>%
+arrange(year, month, day, hour) %>%
+tibble::rownames_to_column() -> data_time
+dstv_cookies %>%
+mutate(time_posix = ymd_hms(TIMESTAMP_TOUCHPOINT)) %>%
+group_by(day = day(time_posix),
+hour = hour(time_posix),
+minute = minute(time_posix),
+channels = MARKETINGCHANNEL) %>%
+
+arrange(hour) %>%
+summarise(count = n(), revenue = sum(REVENUE)) -> dstv_count_cookies
+# Visualization using Hour with Revenue
+ggplot(dstv_count_cookies, aes(hour, revenue, fill=channels)) +
+geom_bar(position = "dodge", stat="identity")
+# Visualization using Day with Revenue
+ggplot(dstv_count_cookies, aes(day, revenue, fill= channels)) +
+geom_bar(position = "dodge", stat="identity")
+# Visualization using Minute with Revenue
+ggplot(dstv_count_cookies, aes(minute, revenue, fill= channels)) +
+geom_bar(position = "dodge", stat="identity")
+# Visualization using Count Vs Revenue
+ggplot(dstv_count_cookies, aes(count, revenue, fill= channels)) +
+
+geom_bar(position = "dodge", stat="identity")
+# Investigating the data by using granularity for understanding the clear picture
+# Day 20 hour 20
+granular_day20 <-dplyr::filter(dstv_count_cookies, day ==20, hour==20)
+# Day 20 hour 21
+granular_Hday20 <-dplyr::filter(dstv_count_cookies, day ==20, hour==21)
+## Creating a time series for Day 20 hour 21
+ts_day20_h21 <- ts(granular_day20$revenue, frequency=1)
+str(ts_day20_h21)
+plot.ts(ts_day20_h21)
+# # Creating a time series for Day 20 hour 20
+# Here in first minutes and the between 4-6 minutes
+ts_day20_h20 <- ts(granular_Hday20$revenue, frequency=1)
+plot.ts(ts_day20_h20)
+## Let look at next day to see granular
+# Day 21 hour 15
+granular_day21 <-dplyr::filter(dstv_count_cookies, day ==21, hour==15)
+# Day 31 hour 19
+granular_Hday21 <-dplyr::filter(dstv_count_cookies, day ==21, hour==16)
+## Time Series for day 21 with hour 15 & 16
+# Here you can see its zero
+ts_H15_day21 <- ts(granular_day21$revenue, frequency = 1)
+# Visualization for day 21 hour 15
+plot.ts(ts_H15_day21)
+#Next hour
+ts_H16_day21 <- ts(granular_Hday21$revenue, frequency = 1)
+# Visualization for day 21 hour 16
+plot.ts(ts_H16_day21)
+# Day 20 hour 20 and Day 21 Hour 15
+# Day 20 hour 20
+ts_count20H20 <- ts(granular_Hday20$count, frequency=1)
+plot.ts(ts_count20H20)
+#Day 21 Hour 15
+ts_count21H15 <- ts(granular_day21$count, frequency = 1)
+plot.ts(ts_count21H15)
+
+# Increase in 8mins, 16mins
+ts_day20_h21_co <- ts(granular_day20$count, freq=1)
+
+plot.ts(ts_day20_h21_co)
+ts_day20_h21_co_re <- ts(granular_day20$count, start = granular_day20$revenue, freq= 1)
+plot.ts(ts_day20_h21_co_re)
+# # Creating a time series for Day 20 hour 20 using count
+ts_day20_h20_co <- ts(granular_Hday20$count, frequency=1)
+plot.ts(ts_day20_h20_co)
